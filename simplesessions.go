@@ -150,6 +150,7 @@ func (sm *SessionManager) ClearExpired() int {
 // If the session exists return an error and the id of the session with a user
 // @param session: 	the session we want to change the uid of
 // @param uid:	the uid to set on the session
+func (sm *SessionManager) SetUID(session *Session, uid int) (string, error) {
 	var err error
 	var sid string
 	for _, s := range sm.Sessions {
