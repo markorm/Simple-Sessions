@@ -1,4 +1,12 @@
-package sessionManager
+/*
+* SIMPLE SESSIONS
+* Provides facilities for managing sessions
+*
+* @author 	github.com/markorm
+* @version	0.1
+*/
+
+package simpleSessions
 
 import (
 	"time"
@@ -9,7 +17,7 @@ import (
 	"encoding/base64"
 )
 
-// SessionOptions
+// === Session Options ===
 // Used to configure the session manager
 // Users should create their own session object and pass it as an argument...
 // ...to NewSessionManager
@@ -22,6 +30,13 @@ type SessionOptions struct {
 	Timeout		time.Duration
 }
 
+// === Session Manager ===
+// Composed of our session options and an array of sessions
+type SessionManager struct {
+	Options		SessionOptions
+	Sessions 	[]Session
+}
+
 // Session
 type Session struct {
 	Id 		string
@@ -30,16 +45,9 @@ type Session struct {
 	Cookie 	*http.Cookie
 }
 
-// Session Manager
-// Composed of our session options and an array of sessions
-type SessionManager struct {
-	Options		SessionOptions
-	Sessions 	[]Session
-}
-
 // === New Session Manager ===
 // Constructor for the Session Manager
-// @param siteName: used to identify the session
+// @param siteName:	used to identify the session
 func NewSessionManager(opts SessionOptions) *SessionManager {
 	sm := SessionManager{}
 	sm.Options = opts
@@ -48,11 +56,11 @@ func NewSessionManager(opts SessionOptions) *SessionManager {
 
 /* ===== Public Methods ==== */
 
-// === GetSession ===
+// === Get Session ===
 // Return a session matching an id and nil error when found
 // Returns a nil pointer value and an error when a session is not found
 // Removes expired sessions
-// @param r: an id to check
+// @param r:	an id to check
 func (sm *SessionManager) GetSession(id string) (*Session, error) {
 	var err error
 	for _, s := range sm.Sessions {
@@ -65,7 +73,7 @@ func (sm *SessionManager) GetSession(id string) (*Session, error) {
 	return nil, err
 }
 
-// === GetUserSession ===
+// === Get User Session ===
 // Return the id of a session that matches a user id
 // Returns a non nil error on fail
 // @param uid:	the id of the user we want to get a session for
@@ -89,10 +97,10 @@ func (sm *SessionManager) GetUserSession(uid int) (string, error) {
 // Make a new session and return an error, nil error is success case
 // Session Uid -1 indicates a guest session
 // Returns the id of the new session
-// @param id:	the id of the user to create the session for,
-func (sm *SessionManager) MakeSession(uid int) string {
+// @param uid:	the uid of the user to create the session for,
+func (sm *SessionManager) NewSession(uid int) string {
 	s := Session{}
-	s.Id = newSID(sm.Options.Salt)
+	s.Id = MakeSID(sm.Options.Salt)
 	s.Expires = time.Now().Add(sm.Options.Timeout * time.Minute)
 	s.Uid = uid
 	sm.Sessions = append(sm.Sessions, s)
@@ -101,7 +109,7 @@ func (sm *SessionManager) MakeSession(uid int) string {
 
 // === Delete Session ===
 // Remove a session matching an id
-// @param id: the id for the sesison to delete
+// @param id:	the id for the sesison to delete
 func (sm *SessionManager) DeleteSession(sid string) {
 	for i, s := range sm.Sessions {
 		if s.Id == sid {
@@ -110,8 +118,8 @@ func (sm *SessionManager) DeleteSession(sid string) {
 	}
 }
 
-// === Set Session ===
-// Create and set a cookie for the specified session
+// === Set Cookie ===
+// Push a session cookie to the response writer
 // @param w: 	the writer interface
 // @param id: 	the session id to set a cookie for
 func (sm *SessionManager) SetCookie(w http.ResponseWriter, s *Session) {
@@ -136,14 +144,34 @@ func (sm *SessionManager) ClearExpired() int {
 	return count
 }
 
-/* ===== Private Functions ===== */
+// === Set Uid ===
+// Make sure this user doesn't have an existing session
+// If user session not found set the session id to user id
+// If the session exists return an error and the id of the session with a user
+// @param session: 	the session we want to change the uid of
+// @param uid:	the uid to set on the session
+	var err error
+	var sid string
+	for _, s := range sm.Sessions {
+		if s.Uid == uid {
+			err = errors.New("Session already exists")
+			sid = s.Id
+		}
+	}
+	if err == nil {
+		session.Uid = uid
+	}
+	return sid, err
+}
 
-// === newSID ===
+// === Make Session ID ===
 // Return a string for the new session id
 // @param salt: value written to byte slice with time.now to randomize output
-func newSID(salt string) string {
+func MakeSID(salt string) string {
 	key := []byte(salt + time.Now().String())
 	h := hmac.New(sha256.New, key)
 	h.Write([]byte(key))
 	return base64.StdEncoding.EncodeToString(h.Sum(nil))
 }
+
+
